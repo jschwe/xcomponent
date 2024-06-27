@@ -1,15 +1,22 @@
 use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
+use crate::log::error;
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 use ohos_sys::{
     ace::xcomponent::native_interface_xcomponent::{
-        OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_TouchEvent
+        OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent,
+        OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_TouchEvent,
     },
     native_window::OHNativeWindow,
 };
 
-use crate::log::error;
-
 mod log;
+
+pub struct Size {
+    pub width: u64,
+    pub height: u64,
+    _opaque: [u64; 0],
+}
 
 pub struct XComponent<'a> {
     xcomponent: NonNull<OH_NativeXComponent>,
@@ -29,7 +36,7 @@ impl<'a> XComponent<'a> {
         })
     }
 
-    pub fn get_touch_event(&mut self) -> Result<OH_NativeXComponent_TouchEvent, i32> {
+    pub fn get_touch_event(&self) -> Result<OH_NativeXComponent_TouchEvent, i32> {
         let touch_event = unsafe {
             let mut touch_event: MaybeUninit<OH_NativeXComponent_TouchEvent> =
                 MaybeUninit::uninit();
@@ -48,7 +55,10 @@ impl<'a> XComponent<'a> {
         Ok(touch_event)
     }
 
-    pub fn register_callback(&mut self, callbacks: OH_NativeXComponent_Callback) -> Result<(), i32> {
+    pub fn register_callback(
+        &mut self,
+        callbacks: OH_NativeXComponent_Callback,
+    ) -> Result<(), i32> {
         // Fixme: Leaking the box fixes a crash in release mode.
         // I would expect `OH_NativeXComponent_RegisterCallback` to copy the callbacks
         // synchronously, so the struct shouldn't need to be leaked, and we should be able to
@@ -56,11 +66,34 @@ impl<'a> XComponent<'a> {
         // This should be investigated at a later point in time, to avoid the leaking.
         let boxed = Box::new(callbacks);
         unsafe {
-            let res = OH_NativeXComponent_RegisterCallback(self.xcomponent.as_ptr(), Box::leak(boxed) as *mut _);
+            let res = OH_NativeXComponent_RegisterCallback(
+                self.xcomponent.as_ptr(),
+                Box::leak(boxed) as *mut _,
+            );
             if res != 0 {
                 return Err(res);
             }
         }
         Ok(())
+    }
+
+    /// Returns the size of the XComponent
+    pub fn size(&self) -> Size {
+        let mut width: u64 = 0;
+        let mut height: u64 = 0;
+        let res = unsafe {
+            OH_NativeXComponent_GetXComponentSize(
+                self.xcomponent.as_ptr(),
+                self.window.as_ptr() as *const c_void,
+                &mut width as *mut _,
+                &mut height as *mut _,
+            )
+        };
+        assert_eq!(res, 0, "OH_NativeXComponent_GetXComponentSize failed");
+        Size {
+            width,
+            height,
+            _opaque: [],
+        }
     }
 }
