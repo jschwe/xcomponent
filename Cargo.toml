@@ -1,6 +1,6 @@
 [package]
 name = "xcomponent"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/jschwe/xcomponent.git"
 description = "Experimental bindings of the OpenHarmonyOS ArkUI XComponent"
