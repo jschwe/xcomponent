@@ -32,8 +32,7 @@ use crate::log::error;
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 use ohos_sys::{
     ace::xcomponent::native_interface_xcomponent::{
-        OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent,
-        OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_TouchEvent,
+        OH_NativeXComponent, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_TouchEvent,
     },
     native_window::OHNativeWindow,
 };
@@ -81,28 +80,6 @@ impl<'a> XComponent<'a> {
         };
 
         Ok(touch_event)
-    }
-
-    pub fn register_callback(
-        &mut self,
-        callbacks: OH_NativeXComponent_Callback,
-    ) -> Result<(), i32> {
-        // Fixme: Leaking the box fixes a crash in release mode.
-        // I would expect `OH_NativeXComponent_RegisterCallback` to copy the callbacks
-        // synchronously, so the struct shouldn't need to be leaked, and we should be able to
-        // use a reference to the stack.
-        // This should be investigated at a later point in time, to avoid the leaking.
-        let boxed = Box::new(callbacks);
-        unsafe {
-            let res = OH_NativeXComponent_RegisterCallback(
-                self.xcomponent.as_ptr(),
-                Box::leak(boxed) as *mut _,
-            );
-            if res != 0 {
-                return Err(res);
-            }
-        }
-        Ok(())
     }
 
     /// Returns the size of the XComponent
