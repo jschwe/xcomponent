@@ -1,3 +1,31 @@
+//! An abstraction over the OpenHarmony [XComponent]
+//!
+//! ## Example
+//! ```
+//! # use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent;
+//! # use core::ffi::c_void;
+//! pub extern "C" fn on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+//!     let xc = xcomponent::XComponent::new(xcomponent, window).expect("Invalid XC");
+//!     let size = xc.size();
+//!     // do something with the xcomponent ...
+//! }
+//!
+//! pub extern "C" fn on_dispatch_touch_event_cb(
+//!     component: *mut OH_NativeXComponent,
+//!     window: *mut c_void,
+//! ) {
+//!      let xc = xcomponent::XComponent::new(component, window).unwrap();
+//!      let touch_event = xc.get_touch_event().unwrap();
+//!      // Handle the touch event ....
+//! }
+//! ```
+//!
+//! ## Features
+//!
+//! * log: Outputs error and diagnostic messages via the `log` crate if enabled.
+//!
+//! [XComponent]: https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/ui/napi-xcomponent-guidelines.md
+
 use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use crate::log::error;
