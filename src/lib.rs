@@ -23,12 +23,12 @@
 //! ## Features
 //!
 //! * log: Outputs error and diagnostic messages via the `log` crate if enabled.
+//! * register: Add `register_xcomponent_callbacks` function to register XComponent callbacks.
 //!
 //! [XComponent]: https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/ui/napi-xcomponent-guidelines.md
 
-use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
-
 use crate::log::error;
+use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 use ohos_sys::{
     ace::xcomponent::native_interface_xcomponent::{
@@ -101,4 +101,104 @@ impl<'a> XComponent<'a> {
             _opaque: [],
         }
     }
+}
+
+#[cfg(feature = "register")]
+#[cfg_attr(docsrs, doc(cfg(feature = "register")))]
+#[derive(Debug)]
+pub enum RegisterCallbackError {
+    XcomponentPropertyMissing(String),
+    UnwrapXComponentFailed(i32),
+    RegisterCallbackFailed(i32),
+}
+
+#[cfg(feature = "register")]
+#[cfg_attr(docsrs, doc(cfg(feature = "register")))]
+impl Into<String> for RegisterCallbackError {
+    fn into(self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+/// Register callbacks for the XComponent
+///
+/// This function is intended to be called from the module init function (See Example below).
+/// We currently require the `callbacks` parameter to have a static lifetime, since despite
+/// contrary documentation `OH_NativeXComponent_RegisterCallback` seems to use the address of
+/// `callback` after it has returned.
+///
+///
+///
+///
+/// ## Example:
+///
+/// ```
+/// # use core::ffi::c_void;
+/// # use log::info;
+/// # use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent, OH_NativeXComponent_Callback};
+/// // use napi_derive_ohos::module_exports;
+/// // #[module_exports]
+/// fn init(exports: napi_ohos::JsObject, env: napi_ohos::Env) -> napi_ohos::Result<()> {
+///     xcomponent::register_xcomponent_callbacks(&exports, &env, &XC_CALLBACKS)
+///         .expect("Registering Callback failed.");
+///     Ok(())
+/// }
+///
+/// static XC_CALLBACKS: OH_NativeXComponent_Callback = OH_NativeXComponent_Callback {
+///     OnSurfaceCreated: Some(on_surface_created_cb),
+///     OnSurfaceChanged: Some(on_surface_changed_cb),
+///     OnSurfaceDestroyed: Some(on_surface_destroyed_cb),
+///     DispatchTouchEvent: Some(on_dispatch_touch_event_cb),
+/// };
+///
+/// // Note: `pub` attribute or `#[no_mangle]` are NOT required, since we just register the function
+/// // pointer.
+/// extern "C" fn on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+///     info!("on_surface_created_cb");
+/// }
+/// extern "C" fn on_surface_changed_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+///     info!("on_surface_changed_cb");
+/// }
+/// extern "C" fn on_surface_destroyed_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+///     info!("on_surface_destroyed_cb");
+/// }
+/// extern "C" fn on_dispatch_touch_event_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+///     info!("on_dispatch_touch_event_cb");
+/// }
+/// ```
+#[cfg(feature = "register")]
+#[cfg_attr(docsrs, doc(cfg(feature = "register")))]
+pub fn register_xcomponent_callbacks(
+    exports: &napi_ohos::JsObject,
+    env: &napi_ohos::Env,
+    callbacks: &'static ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_Callback,
+) -> Result<(), RegisterCallbackError> {
+    use napi_ohos::NapiRaw;
+    use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_RegisterCallback;
+
+    let xcomponent_js_object = exports
+        .get_named_property::<napi_ohos::JsObject>("__NATIVE_XCOMPONENT_OBJ__")
+        .map_err(|e| RegisterCallbackError::XcomponentPropertyMissing(e.to_string()))?;
+    let raw = unsafe { xcomponent_js_object.raw() };
+    let raw_env = env.raw();
+    let mut native_xcomponent: *mut OH_NativeXComponent = core::ptr::null_mut();
+    let res = unsafe {
+        napi_ohos::sys::napi_unwrap(
+            raw_env,
+            raw,
+            &mut native_xcomponent as *mut *mut OH_NativeXComponent as *mut *mut c_void,
+        )
+    };
+    if res != 0 {
+        return Err(RegisterCallbackError::UnwrapXComponentFailed(res));
+    }
+    let res =
+        // Note: The register function seems to offload the work to some other thread and return early.
+        // so the CBs need to live longer than this function ....
+        // SAFETY: `OH_NativeXComponent_RegisterCallback` will not mutate `callbacks`.
+        unsafe { OH_NativeXComponent_RegisterCallback(native_xcomponent, callbacks as *const _ as *mut _) };
+    if res != 0 {
+        return Err(RegisterCallbackError::RegisterCallbackFailed(res));
+    }
+    Ok(())
 }
