@@ -1,6 +1,6 @@
 [package]
 name = "xcomponent"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 repository = "https://github.com/jschwe/xcomponent.git"
 description = "Experimental bindings of the OpenHarmonyOS ArkUI XComponent"
@@ -10,7 +10,7 @@ license = "Apache-2.0"
 [dependencies]
 log = { version = "0.4.21", optional = true }
 ohos-sys = "0.1.0"
-napi-ohos = {version = "*", optional = true}
+napi-ohos = {version = "0.1", optional = true}
 
 [features]
 log = ["dep:log"]
