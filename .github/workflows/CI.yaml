@@ -27,3 +27,5 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
       - run: cargo build
+      - name: Test all features
+        run: cargo build --all-features
